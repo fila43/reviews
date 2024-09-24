@@ -31,6 +31,7 @@
 %global spatialite "--with-spatialite"
 %endif
 
+%bcond_without java
 %bcond_without python3
 
 # No ppc64 build for spatialite in EL6
@@ -44,7 +45,7 @@
 
 Name:          gdal
 Version:       3.4.3
-Release:       2%{?dist}
+Release:       3%{?dist}
 Summary:       GIS file format library
 License:       MIT
 URL:           http://www.gdal.org
@@ -101,17 +102,8 @@ BuildRequires: ghostscript
 BuildRequires: hdf-devel
 BuildRequires: hdf-static
 BuildRequires: hdf5-devel
-# No complete java yet in EL8
-%if 0%{?rhel} < 8
-BuildRequires: java-devel >= 1:1.6.0
-%endif
 BuildRequires: jasper-devel
 BuildRequires: jpackage-utils
-# No complete java yet in EL8
-%if 0%{?rhel} < 8
-# For 'mvn_artifact' and 'mvn_install'
-BuildRequires: javapackages-local
-%endif
 BuildRequires: json-c-devel
 BuildRequires: libgeotiff-devel
 BuildRequires: libgta-devel
@@ -207,10 +199,12 @@ Provides:      bundled(degrib) = 2.14
 This package contains the GDAL file format library.
 
 
-# No complete java yet in EL8
-%if 0%{?rhel} < 8
+%if %{with java}
 %package java
 Summary:        Java modules for the GDAL file format library
+BuildRequires:  java-devel >= 1:1.6.0
+# For 'mvn_artifact' and 'mvn_install'
+BuildRequires:  javapackages-local
 Requires:       jpackage-utils
 Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
 
@@ -322,7 +316,7 @@ autoreconf -ifv
 	--with-hdf4                 \
 	--with-hdf5                 \
 	--with-jasper               \
-%if 0%{?rhel} < 8
+%if %{with java}
 	--with-java                 \
 %endif
 	--with-jpeg                 \
@@ -361,8 +355,7 @@ make -C frmts/iso8211 all
 make man
 make docs
 
-# No complete java yet in EL8
-%if 0%{?rhel} < 8
+%if %{with java}
 
 # Make Java module and documentation
 pushd swig/java
@@ -418,8 +411,7 @@ rm %buildroot%_mandir/man1/{pct2rgb,rgb2pct}.1
 find %{buildroot}%{perl_vendorarch} -name "*.so" -exec chmod 755 '{}' \;
 find %{buildroot}%{perl_vendorarch} -name "*.pm" -exec chmod 644 '{}' \;
 
-# No complete java yet in EL8
-%if 0%{?rhel} < 8
+%if %{with java}
 # install Java plugin
 %mvn_install -J swig/java/java
 
@@ -495,8 +487,7 @@ done
 rm %{buildroot}%{_datadir}/%{name}/LICENSE.TXT
 
 
-# No complete java yet in EL8
-%if 0%{?rhel} < 8
+%if %{with java}
 %check
 %if %{run_tests}
 for i in -I/usr/lib/jvm/java/include{,/linux}; do
@@ -590,8 +581,7 @@ popd
 %{_libdir}/*.so
 %{_libdir}/pkgconfig/%{name}.pc
 
-# No complete java yet in EL8
-%if 0%{?rhel} < 8
+%if %{with java}
 # Can I even have a separate Java package anymore?
 %files java -f .mfiles
 %doc swig/java/apps
@@ -635,6 +625,9 @@ popd
 #Or as before, using ldconfig
 
 %changelog
+* Tue Sep 24 2024 Orion Poplawski <orion@nwra.com> - 3.4.3-3
+- Re-enable java
+
 * Mon Jan 01 2024 Sandro Mani <manisandro@gmail.com> - 3.4.3-2
 - Rebuild (armadillo)
 
