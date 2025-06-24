@@ -45,7 +45,7 @@
 
 Name:          gdal
 Version:       3.4.3
-Release:       3%{?dist}
+Release:       4%{?dist}
 Summary:       GIS file format library
 License:       MIT
 URL:           http://www.gdal.org
@@ -625,6 +625,9 @@ popd
 #Or as before, using ldconfig
 
 %changelog
+* Tue Jun 24 2025 Orion Poplawski <orion@nwra.com> - 3.4.3-4
+- Rebuild for proj 9
+
 * Tue Sep 24 2024 Orion Poplawski <orion@nwra.com> - 3.4.3-3
 - Re-enable java
 
