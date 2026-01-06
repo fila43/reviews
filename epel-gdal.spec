@@ -15,8 +15,6 @@
 %global testversion 3.4.3
 %global run_tests 1
 
-%global bashcompletiondir %(pkg-config --variable=compatdir bash-completion)
-
 %if 0%{?bootstrap}
 %global with_mysql 0
 %global mysql --without-mysql
@@ -92,7 +90,6 @@ BuildRequires: automake
 BuildRequires: autoconf
 BuildRequires: ant
 BuildRequires: armadillo-devel
-BuildRequires: bash-completion
 BuildRequires: cfitsio-devel
 #BuildRequires: CharLS-devel
 BuildRequires: chrpath
@@ -299,6 +296,52 @@ cp -p %SOURCE4 .
   sed -i 's|with_dods_root/lib|with_dods_root/lib64|' configure.ac
 %endif
 
+# Rename library from libgdal to libgdal-epel in source files
+# This ensures the library is built with correct SONAME and all bindings link correctly
+
+# ============================================================
+# CRITICAL: gdal-config.in is the KEY file!
+# Python/Perl/Java bindings call: gdal-config --libs
+# This must return -lgdal-epel instead of -lgdal
+# ============================================================
+
+# Fix apps/gdal-config.in template - THIS IS THE MOST IMPORTANT ONE
+# The --libs output contains -lgdal which must become -lgdal-epel
+sed -i 's/-lgdal$/-lgdal%{libsuffix}/' apps/gdal-config.in
+sed -i 's/-lgdal /-lgdal%{libsuffix} /g' apps/gdal-config.in
+sed -i 's/-lgdal"/-lgdal%{libsuffix}"/g' apps/gdal-config.in
+
+# Main library name in GDALmake.opt.in template
+sed -i 's/GDAL_SLIB_LINK = -lgdal/GDAL_SLIB_LINK = -lgdal%{libsuffix}/' GDALmake.opt.in
+sed -i 's/GDAL_SLIB_SONAME = libgdal/GDAL_SLIB_SONAME = libgdal%{libsuffix}/' GDALmake.opt.in
+sed -i 's/GDAL_SLIB = \$(GDAL_ROOT)\/libgdal/GDAL_SLIB = $(GDAL_ROOT)\/libgdal%{libsuffix}/' GDALmake.opt.in
+
+# Fix library name patterns in GDALmake.opt.in
+sed -i 's/libgdal\.la/libgdal%{libsuffix}.la/g' GDALmake.opt.in
+sed -i 's/libgdal\.so/libgdal%{libsuffix}.so/g' GDALmake.opt.in
+
+# Fix in configure.ac where SONAME and library name is generated
+sed -i 's/libgdal\.\${GDAL_VERSION_MAJOR}/libgdal%{libsuffix}.${GDAL_VERSION_MAJOR}/g' configure.ac
+sed -i 's/libgdal\.so/libgdal%{libsuffix}.so/g' configure.ac
+sed -i 's/libgdal\.la/libgdal%{libsuffix}.la/g' configure.ac
+sed -i 's/-lgdal"/-lgdal%{libsuffix}"/g' configure.ac
+sed -i "s/-lgdal'/-lgdal%{libsuffix}'/g" configure.ac
+sed -i 's/-lgdal /-lgdal%{libsuffix} /g' configure.ac
+
+# Fix swig Makefiles (these may also have hardcoded -lgdal)
+find swig -name "GNUmakefile" -o -name "Makefile*" -o -name "*.opt*" | \
+    xargs sed -i 's/-lgdal\b/-lgdal%{libsuffix}/g' 2>/dev/null || true
+
+# Fix Python setup.py if it has hardcoded library name
+sed -i "s/'gdal'/'gdal%{libsuffix}'/g" swig/python/setup.py 2>/dev/null || true
+sed -i 's/"gdal"/"gdal%{libsuffix}"/g' swig/python/setup.py 2>/dev/null || true
+
+# Fix Perl Makefile.PL
+sed -i "s/'gdal'/'gdal%{libsuffix}'/g" swig/perl/Makefile.PL 2>/dev/null || true
+
+# Fix Java build files
+sed -i 's/-lgdal\b/-lgdal%{libsuffix}/g' swig/java/java.opt.in 2>/dev/null || true
+
 
 %build
 # For future reference:
@@ -306,14 +349,10 @@ cp -p %SOURCE4 .
 # Building without pgeo driver, because it drags in Java
 autoreconf -ifv
 
-# Rename library to libgdal-epel.so
-export GDAL_LIB_NAME=gdal%{libsuffix}
-
 %configure \
 	--with-autoload=%{_libdir}/%{name}plugins \
 	--includedir=%{_includedir}/%{name}/ \
 	--prefix=%{_prefix}         \
-	--with-bash-completion      \
 	--with-armadillo            \
 	--with-curl                 \
 	--with-cfitsio              \
@@ -356,11 +395,7 @@ export GDAL_LIB_NAME=gdal%{libsuffix}
 	--enable-shared             \
 	--with-libkml
 
-# Rename the library to libgdal-epel
-sed -i 's/libgdal\.la/libgdal%{libsuffix}.la/g' GDALmake.opt
-sed -i 's/libgdal\./libgdal%{libsuffix}./g' GDALmake.opt
-sed -i 's/-lgdal/-lgdal%{libsuffix}/g' GDALmake.opt
-
+# Build with standard library name, rename during install
 %make_build
 
 # Build some utilities, as requested in BZ #1271906
@@ -402,24 +437,16 @@ popd
 
 %make_install install-man
 
-# Rename installed libraries to include -epel suffix
-if [ -f %{buildroot}%{_libdir}/libgdal.so.30 ]; then
-    mv %{buildroot}%{_libdir}/libgdal.so.30* %{buildroot}%{_libdir}/libgdal%{libsuffix}.so.30* 2>/dev/null || true
-fi
-
-# Fix library symlinks
+# Library should already be built as libgdal-epel.so due to source modifications in %prep
+# Verify and create proper symlinks
 pushd %{buildroot}%{_libdir}
-for f in libgdal.so*; do
-    if [ -L "$f" ] || [ -f "$f" ]; then
-        newname=$(echo "$f" | sed 's/libgdal\./libgdal%{libsuffix}./g')
-        if [ "$f" != "$newname" ]; then
-            mv "$f" "$newname" 2>/dev/null || true
-        fi
-    fi
-done
-# Create proper symlinks
-rm -f libgdal%{libsuffix}.so
-ln -sf libgdal%{libsuffix}.so.30 libgdal%{libsuffix}.so
+# List what was installed for debugging
+ls -la libgdal* 2>/dev/null || true
+# Ensure symlinks are correct
+if [ -f libgdal%{libsuffix}.so.30.* ] || [ -L libgdal%{libsuffix}.so.30 ]; then
+    rm -f libgdal%{libsuffix}.so
+    ln -sf libgdal%{libsuffix}.so.30 libgdal%{libsuffix}.so
+fi
 popd
 
 # Drop gdal.pdf symlink, as we don't build the pdf documentation
@@ -554,16 +581,6 @@ if [ -f %{buildroot}%{_libdir}/pkgconfig/%{pkgname}.pc ]; then
     sed -i 's/-lgdal/-lgdal%{libsuffix}/g' %{buildroot}%{_libdir}/pkgconfig/%{name}.pc
 fi
 
-# Rename bash completions
-if [ -d %{buildroot}%{bashcompletiondir} ]; then
-    for f in %{buildroot}%{bashcompletiondir}/*; do
-        if [ -f "$f" ]; then
-            basename=$(basename "$f")
-            mv "$f" %{buildroot}%{bashcompletiondir}/epel-${basename}
-        fi
-    done
-fi
-
 # Rename man pages
 for f in %{buildroot}%{_mandir}/man1/gdal*.1*; do
     if [ -f "$f" ]; then
@@ -588,6 +605,15 @@ for f in %{buildroot}%{_mandir}/man1/gnm*.1*; do
     fi
 done
 for f in %{buildroot}%{_mandir}/man1/nearblack.1*; do
+    if [ -f "$f" ]; then
+        dir=$(dirname "$f")
+        base=$(basename "$f")
+        mv "$f" "${dir}/epel-${base}"
+    fi
+done
+# Rename Python tools man pages (pct2rgb, rgb2pct, etc.)
+for f in %{buildroot}%{_mandir}/man1/pct2rgb.1* \
+         %{buildroot}%{_mandir}/man1/rgb2pct.1*; do
     if [ -f "$f" ]; then
         dir=$(dirname "$f")
         base=$(basename "$f")
@@ -668,7 +694,6 @@ popd
 %{_bindir}/epel-s57*
 %{_bindir}/epel-gnmanalyse
 %{_bindir}/epel-gnmmanage
-%{_datadir}/bash-completion/completions/epel-*
 %{_mandir}/man1/epel-gdal*.1*
 %exclude %{_mandir}/man1/epel-gdal-config.1*
 %exclude %{_mandir}/man1/epel-gdal2tiles.1*
