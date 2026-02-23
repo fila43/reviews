@@ -29,6 +29,7 @@
 
 #include "access/htup_details.h"
 #include "access/relation.h"
+#include "mb/pg_wchar.h"
 #include "funcapi.h"
 #include "catalog/pg_am_d.h"
 #include "catalog/pg_type.h"
@@ -99,7 +100,8 @@ text_to_bits(char *str, int len)
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("illegal character '%c' in t_bits string", str[off])));
+					 errmsg("invalid character \"%.*s\" in t_bits string",
+							pg_mblen_cstr(str + off), str + off)));
 
 		if (off % 8 == 7)
 			bits[off / 8] = byte;
