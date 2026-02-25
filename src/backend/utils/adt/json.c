@@ -827,7 +827,7 @@ json_lex_string(JsonLexContext *lex)
 						ch = (ch * 16) + (*s - 'A') + 10;
 					else
 					{
-						lex->token_terminator = s + pg_mblen(s);
+						lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 								 errmsg("invalid input syntax for type %s",
@@ -845,7 +845,7 @@ json_lex_string(JsonLexContext *lex)
 					{
 						if (hi_surrogate != -1)
 						{
-							lex->token_terminator = s + pg_mblen(s);
+							lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 							ereport(ERROR,
 									(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 									 errmsg("invalid input syntax for type %s",
@@ -860,7 +860,7 @@ json_lex_string(JsonLexContext *lex)
 					{
 						if (hi_surrogate == -1)
 						{
-							lex->token_terminator = s + pg_mblen(s);
+							lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 							ereport(ERROR,
 									(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 									 errmsg("invalid input syntax for type %s", "json"),
@@ -873,7 +873,7 @@ json_lex_string(JsonLexContext *lex)
 
 					if (hi_surrogate != -1)
 					{
-						lex->token_terminator = s + pg_mblen(s);
+						lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 								 errmsg("invalid input syntax for type %s", "json"),
@@ -891,7 +891,7 @@ json_lex_string(JsonLexContext *lex)
 					if (ch == 0)
 					{
 						/* We can't allow this, since our TEXT type doesn't */
-						lex->token_terminator = s + pg_mblen(s);
+						lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 						ereport(ERROR,
 								(errcode(ERRCODE_UNTRANSLATABLE_CHARACTER),
 								 errmsg("unsupported Unicode escape sequence"),
@@ -915,7 +915,7 @@ json_lex_string(JsonLexContext *lex)
 					}
 					else
 					{
-						lex->token_terminator = s + pg_mblen(s);
+						lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 						ereport(ERROR,
 								(errcode(ERRCODE_UNTRANSLATABLE_CHARACTER),
 								 errmsg("unsupported Unicode escape sequence"),
@@ -928,7 +928,7 @@ json_lex_string(JsonLexContext *lex)
 			{
 				if (hi_surrogate != -1)
 				{
-					lex->token_terminator = s + pg_mblen(s);
+					lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 							 errmsg("invalid input syntax for type %s",
@@ -961,7 +961,7 @@ json_lex_string(JsonLexContext *lex)
 						break;
 					default:
 						/* Not a valid string escape, so error out. */
-						lex->token_terminator = s + pg_mblen(s);
+						lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 								 errmsg("invalid input syntax for type %s",
@@ -980,7 +980,7 @@ json_lex_string(JsonLexContext *lex)
 				 * replace it with a switch statement, but testing so far has
 				 * shown it's not a performance win.
 				 */
-				lex->token_terminator = s + pg_mblen(s);
+				lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("invalid input syntax for type %s", "json"),
@@ -993,7 +993,7 @@ json_lex_string(JsonLexContext *lex)
 		{
 			if (hi_surrogate != -1)
 			{
-				lex->token_terminator = s + pg_mblen(s);
+				lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("invalid input syntax for type %s", "json"),
@@ -1008,7 +1008,7 @@ json_lex_string(JsonLexContext *lex)
 
 	if (hi_surrogate != -1)
 	{
-		lex->token_terminator = s + pg_mblen(s);
+		lex->token_terminator = s + pg_mblen_range(s, lex->input + lex->input_length);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 				 errmsg("invalid input syntax for type %s", "json"),
@@ -1315,7 +1315,7 @@ report_json_context(JsonLexContext *lex)
 			break;
 		/* Advance to next multibyte character */
 		if (IS_HIGHBIT_SET(*context_start))
-			context_start += pg_mblen(context_start);
+			context_start += pg_mblen_range(context_start, context_end);
 		else
 			context_start++;
 	}
@@ -1354,7 +1354,7 @@ extract_mb_char(char *s)
 	char	   *res;
 	int			len;
 
-	len = pg_mblen(s);
+	len = pg_mblen_cstr(s);
 	res = palloc(len + 1);
 	memcpy(res, s, len);
 	res[len] = '\0';
