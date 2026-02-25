@@ -1777,7 +1777,7 @@ pg_eucjp_increment(unsigned char *charptr, int length)
 const pg_wchar_tbl pg_wchar_table[] = {
 	{pg_ascii2wchar_with_len, pg_wchar2single_with_len, pg_ascii_mblen, pg_ascii_dsplen, pg_ascii_verifier, 1}, /* PG_SQL_ASCII */
 	{pg_eucjp2wchar_with_len, pg_wchar2euc_with_len, pg_eucjp_mblen, pg_eucjp_dsplen, pg_eucjp_verifier, 3},	/* PG_EUC_JP */
-	{pg_euccn2wchar_with_len, pg_wchar2euc_with_len, pg_euccn_mblen, pg_euccn_dsplen, pg_euccn_verifier, 2},	/* PG_EUC_CN */
+	{pg_euccn2wchar_with_len, pg_wchar2euc_with_len, pg_euccn_mblen, pg_euccn_dsplen, pg_euccn_verifier, 3},	/* PG_EUC_CN */
 	{pg_euckr2wchar_with_len, pg_wchar2euc_with_len, pg_euckr_mblen, pg_euckr_dsplen, pg_euckr_verifier, 3},	/* PG_EUC_KR */
 	{pg_euctw2wchar_with_len, pg_wchar2euc_with_len, pg_euctw_mblen, pg_euctw_dsplen, pg_euctw_verifier, 4},	/* PG_EUC_TW */
 	{pg_eucjp2wchar_with_len, pg_wchar2euc_with_len, pg_eucjp_mblen, pg_eucjp_dsplen, pg_eucjp_verifier, 3},	/* PG_EUC_JIS_2004 */
@@ -2039,16 +2039,26 @@ check_encoding_conversion_args(int src_encoding,
  * note: len is remaining length of string, not length of character;
  * len must be greater than zero, as we always examine the first byte.
  */
+static void report_invalid_encoding_int(int encoding, const char *mbstr,
+										int mblen, int len);
+
 void
 report_invalid_encoding(int encoding, const char *mbstr, int len)
 {
 	int			l = pg_encoding_mblen(encoding, mbstr);
+
+	report_invalid_encoding_int(encoding, mbstr, l, len);
+}
+
+static void
+report_invalid_encoding_int(int encoding, const char *mbstr, int mblen, int len)
+{
 	char		buf[8 * 5 + 1];
 	char	   *p = buf;
 	int			j,
 				jlimit;
 
-	jlimit = Min(l, len);
+	jlimit = Min(mblen, len);
 	jlimit = Min(jlimit, 8);	/* prevent buffer overrun */
 
 	for (j = 0; j < jlimit; j++)
@@ -2063,6 +2073,12 @@ report_invalid_encoding(int encoding, const char *mbstr, int len)
 			 errmsg("invalid byte sequence for encoding \"%s\": %s",
 					pg_enc2name_tbl[encoding].name,
 					buf)));
+}
+
+void
+report_invalid_encoding_db(const char *mbstr, int mblen, int len)
+{
+	report_invalid_encoding_int(GetDatabaseEncoding(), mbstr, mblen, len);
 }
 
 /*

@@ -52,7 +52,7 @@ ltree_in(PG_FUNCTION_ARGS)
 	ptr = buf;
 	while (*ptr)
 	{
-		charlen = pg_mblen(ptr);
+		charlen = pg_mblen_cstr(ptr);
 		if (charlen == 1 && t_iseq(ptr, '.'))
 			num++;
 		ptr += charlen;
@@ -67,7 +67,7 @@ ltree_in(PG_FUNCTION_ARGS)
 	ptr = buf;
 	while (*ptr)
 	{
-		charlen = pg_mblen(ptr);
+		charlen = pg_mblen_cstr(ptr);
 
 		if (state == LTPRS_WAITNAME)
 		{
@@ -213,7 +213,7 @@ lquery_in(PG_FUNCTION_ARGS)
 	ptr = buf;
 	while (*ptr)
 	{
-		charlen = pg_mblen(ptr);
+		charlen = pg_mblen_cstr(ptr);
 
 		if (charlen == 1)
 		{
@@ -236,7 +236,7 @@ lquery_in(PG_FUNCTION_ARGS)
 	ptr = buf;
 	while (*ptr)
 	{
-		charlen = pg_mblen(ptr);
+		charlen = pg_mblen_cstr(ptr);
 
 		if (state == LQPRS_WAITLEVEL)
 		{
@@ -355,7 +355,7 @@ lquery_in(PG_FUNCTION_ARGS)
 		{
 			if (charlen == 1 && t_iseq(ptr, ','))
 				state = LQPRS_WAITSNUM;
-			else if (t_isdigit(ptr))
+			else if (t_isdigit_cstr(ptr))
 			{
 				int			low = atoi(ptr);
 
@@ -374,7 +374,7 @@ lquery_in(PG_FUNCTION_ARGS)
 		}
 		else if (state == LQPRS_WAITSNUM)
 		{
-			if (t_isdigit(ptr))
+			if (t_isdigit_cstr(ptr))
 			{
 				int			high = atoi(ptr);
 
@@ -400,7 +400,7 @@ lquery_in(PG_FUNCTION_ARGS)
 		{
 			if (charlen == 1 && t_iseq(ptr, '}'))
 				state = LQPRS_WAITEND;
-			else if (!t_isdigit(ptr))
+			else if (!t_isdigit_cstr(ptr))
 				UNCHAR;
 		}
 		else if (state == LQPRS_WAITND)
@@ -412,7 +412,7 @@ lquery_in(PG_FUNCTION_ARGS)
 			}
 			else if (charlen == 1 && t_iseq(ptr, ','))
 				state = LQPRS_WAITSNUM;
-			else if (!t_isdigit(ptr))
+			else if (!t_isdigit_cstr(ptr))
 				UNCHAR;
 		}
 		else if (state == LQPRS_WAITEND)
